@@ -1,6 +1,6 @@
 # 16-bit CPU in Logisim-evolution
  
-A single-cycle 16-bit processor designed from the gate level up in [Logisim-evolution](https://github.com/logisim-evolution/logisim-evolution). Every major block (adder, ALU, shifters, register file, decode, and control) is built from basic logic gates, flip-flops, and multiplexers rather than library components, and the CPU runs programs end to end with keyboard input and terminal output.
+A single-cycle 16-bit processor designed in [Logisim-evolution](https://github.com/logisim-evolution/logisim-evolution). The adder, ALU, barrel shifters, and register file are built by hand from logic gates, flip-flops, and multiplexers, while memory and I/O use Logisim's built-in RAM, ROM, keyboard, and terminal. The CPU runs programs end to end, reading keyboard input and printing to a text terminal.
  
 ![Top-level CPU circuit in Logisim-evolution](cpu_diagram.png)
 *The top-level `main` circuit, with each block wired together. A guided tour of this view is in [Reading the main circuit](#reading-the-main-circuit).*
@@ -13,9 +13,9 @@ A single-cycle 16-bit processor designed from the gate level up in [Logisim-evol
 - **Hand-built 16-bit ALU** with add, subtract, XOR, NOT, logical shifts, zero detection, and signed less-than comparison
 - **Barrel shifters** for left and right shifts, each built from 48 multiplexers in three stages (shift by 0–7 in a single cycle)
 - **Register file** of eight 16-bit registers (`$r0` hardwired to zero), with two read ports and one write port, built from 112 D flip-flops
-- **Memory-mapped I/O** through a keyboard input and an 80×13 text terminal
+- **Keyboard and terminal I/O** through dedicated `input` and `output` instructions, with an 80×13 text terminal
 - **Write-safe data memory** using a latching circuit that holds address, data, and write-enable stable for a full clock cycle
-- **Hierarchical design:** 13 reusable subcircuits, each tested on its own before integration
+- **Hierarchical design:** 13 reusable subcircuits, from a 1-bit full adder up to the full datapath
 ---
  
 ## Architecture
@@ -99,8 +99,8 @@ All instructions are 16 bits wide.
 | `1011` | `j`    | J | `PC = address` |
 | `1100` | `jr`   | R | `PC = rs` |
 | `1101` | `jal`  | J | `$r7 = PC + 1`, `PC = address` |
-| `1110` | `input`  | R | read a character from the keyboard into a register |
-| `1111` | `output` | R | write a register's value to the terminal |
+| `1110` | `input`  | R | `rd` = next character from the keyboard |
+| `1111` | `output` | R | print the character in `rs` to the terminal |
  
 Branch offsets are relative to the next instruction. `jal` stores the return address in `$r7`, so `jr $r7` returns from a function call.
  
@@ -115,7 +115,7 @@ Branch offsets are relative to the next instruction. `jal` stores the return add
 | `ALU` | Selects among add, subtract, XOR, NOT, shift-left, and shift-right; outputs zero and less-than flags |
 | `leftShift` / `rightShift` | Three-stage logarithmic barrel shifters (shift by 1, 2, and 4) |
 | `isZero` | 16-input zero detector |
-| `lessThan` | Signed comparison using the subtractor's sign and overflow |
+| `lessThan` | Signed comparison that computes `A - B` and checks the sign bit of the result |
 | `singleRegister` | 16-bit register from 16 D flip-flops with write-enable and reset |
 | `RegisterFile` | Eight registers with decoder-driven write select and tri-state buffered read ports |
 | `PCReg` | Program counter register |
@@ -144,8 +144,15 @@ To explore a single block, double-click any subcircuit in the explorer panel and
 - Trade-offs in arithmetic circuit design, such as ripple-carry addition versus faster approaches, and multiplexer-based shifting
 ---
  
+## Limitations and possible improvements
+ 
+- **Ripple-carry adder:** simple and easy to verify, but the carry must pass through all 16 bits. A carry-lookahead adder would shorten the critical path.
+- **Single-cycle design:** the clock period has to cover the slowest instruction (`lw`). Pipelining would raise throughput at the cost of hazard handling.
+- **Comparison:** `blt` uses only the sign of `A - B`, so it can give the wrong answer when the subtraction overflows (very large positive vs. very negative values). Checking the overflow flag as well would fix this.
+- **Shift range:** the 3-bit `shamt` field limits shifts to 0–7 bits per instruction.
+---
+ 
 ## Author
  
 **Caleb Pucylowski**
 [GitHub](https://github.com/CalebPuc) · [LinkedIn](https://www.linkedin.com/in/caleb-pucylowski)
- 
