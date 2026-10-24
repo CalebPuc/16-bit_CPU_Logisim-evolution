@@ -21,31 +21,44 @@ A single-cycle 16-bit processor designed in [Logisim-evolution](https://github.c
 ## Architecture
  
 ```mermaid
-flowchart LR
-    PC[Program Counter] --> ROM[Instruction Memory]
-    ROM --> SPLIT[Instruction Decoder]
-    SPLIT -->|opcode| CTRL[Control Logic<br/>4-to-16 decoder]
-    SPLIT -->|rs, rt, rd| RF[Register File<br/>8 x 16-bit]
-    SPLIT -->|imm / address| EXT[Sign / Zero Extend]
-    RF -->|A| ALU[ALU]
-    RF -->|B| MUXB{ALU B mux}
+flowchart TB
+    subgraph FETCH["1 · Fetch"]
+        direction LR
+        PC[Program Counter] --> ROM[Instruction Memory]
+    end
+ 
+    subgraph DECODE["2 · Decode"]
+        direction LR
+        SPLIT[Instruction Splitter] -->|opcode| CTRL[Control Logic<br/>4-to-16 decoder]
+        SPLIT -->|rs, rt, rd| RF[Register File<br/>8 × 16-bit]
+        SPLIT -->|imm / address| EXT[Sign / Zero Extend]
+    end
+ 
+    subgraph EXECUTE["3 · Execute"]
+        direction LR
+        MUXB{ALU B<br/>select} --> ALU[ALU]
+    end
+ 
+    subgraph MEMWB["4 · Memory and Write-back"]
+        direction LR
+        MEM[Data Memory<br/>via latch] --> WB{Write-back<br/>select}
+        KB[Keyboard] --> WB
+    end
+ 
+    ROM --> SPLIT
+    RF -->|A| ALU
+    RF -->|B| MUXB
     EXT --> MUXB
-    MUXB --> ALU
-    ALU --> MEM[Data Memory<br/>via latch]
-    RF --> MEM
-    ALU --> WB{Write-back mux}
-    MEM --> WB
-    KB[Keyboard] --> WB
-    WB --> RF
-    RF --> TTY[Terminal]
-    ALU -->|zero / less-than flags| NEXT{Next-PC logic}
-    EXT --> NEXT
-    RF -->|jr target| NEXT
-    NEXT --> PC
-    CTRL -.-> MUXB
-    CTRL -.-> WB
-    CTRL -.-> NEXT
-    CTRL -.-> MEM
+    ALU -->|address| MEM
+    RF -->|store data| MEM
+    ALU -->|result| WB
+    RF -->|output| TTY[Terminal]
+    WB -.->|write back| RF
+ 
+    ALU -.->|zero / less-than| NEXT{Next-PC<br/>logic}
+    EXT -.->|branch offset / jump address| NEXT
+    RF -.->|jr target| NEXT
+    NEXT -.-> PC
 ```
  
 Each instruction is fetched, decoded, executed, and written back within a single clock cycle. The control unit decodes the 4-bit opcode into one-hot control signals that steer the multiplexers selecting the ALU operand, the write-back source, the destination register, and the next program counter.
